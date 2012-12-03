@@ -22,27 +22,27 @@ Examples
 --------
 Some examples below, do note that the depicted fonts aren't available from here, but easily re-created from the linked Original sources:
 
-![C with JUnicode Mono](https://github.com/arnognulf/monospacipy/raw/master/images/junicode_c.png)
+![C with JUnicode Mono](https://github.com/arnognulf/monospaci.py/raw/master/images/junicode_c.png)
 
-JUnicode, excellent for studying old languages. ([Original](http://junicode.sourceforge.net/)
+JUnicode, excellent for studying old languages. ([Original](http://junicode.sourceforge.net/))
 
-![.vimrc with Sniglet Mono](https://github.com/arnognulf/monospacipy/raw/master/images/sniglet_ftw.png)
+![.vimrc with Sniglet Mono](https://github.com/arnognulf/monospaci.py/raw/master/images/sniglet_ftw.png)
 
-Sniglet Mono, when your vim needs more kittens. ([Original](https://github.com/theleagueof/sniglet)
+Sniglet Mono, when your vim needs more kittens. ([Original](https://github.com/theleagueof/sniglet))
 
-![C++ with EB Garamond Mono](https://github.com/arnognulf/monospacipy/raw/master/images/garamond_cpp.png)
+![C++ with EB Garamond Mono](https://github.com/arnognulf/monospaci.py/raw/master/images/garamond_cpp.png))
 
-EB Garamond Mono, when your C++ isn't classy enough ([Original](http://www.georgduffner.at/ebgaramond/)
+EB Garamond Mono, when your C++ isn't classy enough ([Original](http://www.georgduffner.at/ebgaramond/))
 
-![Python with Fifth Leg Mono](https://github.com/arnognulf/monospacipy/raw/master/images/squared_python.png)
+![Python with Fifth Leg Mono](https://github.com/arnognulf/monospaci.py/raw/master/images/squared_python.png))
 
-Fifth Leg Mono, thinking inside the box with Python ([Original](http://gitorious.org/opensuse/art/trees/master/00assets/fonts)
+Fifth Leg Mono, thinking inside the box with Python ([Original](http://gitorious.org/opensuse/art/trees/master/00assets/fonts))
 
-![Java with Comic Sans MS Mono](https://github.com/arnognulf/monospacipy/raw/master/images/java_fun.png)
+![Java with Comic Sans MS Mono](https://github.com/arnognulf/monospaci.py/raw/master/images/java_fun.png)
 
 Comic Sans MS Mono, really makes your Java pop!
 
-![JavaScript with Papyrus Mono](https://github.com/arnognulf/monospacipy/raw/master/images/classy_javascript.png)
+![JavaScript with Papyrus Mono](https://github.com/arnognulf/monospaci.py/raw/master/images/classy_javascript.png)
 
 Papyrus Mono, give your JavaScript that antique look!
 
