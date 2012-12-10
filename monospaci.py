@@ -38,35 +38,64 @@ namesList = "NamesList.txt"
 fontList = list()
 glifs = set()
 index = 0
-
+spaceFactor = 1.0
 nextArgIsNamesList = False
+nextArgIsSpaceFactor = False
+nextArgIsName = False
+name = ""
+verbose = False
 for arg in sys.argv:
     index = index + 1
     if nextArgIsNamesList :
         namesList = arg
         nextArgIsNamesList = False
         continue
+    if nextArgIsSpaceFactor :
+        nextArgIsSpaceFactor = False
+        spaceFactor = float(arg)
+        continue
+    if nextArgIsName :
+        nextArgIsName = False
+        name = arg
+        continue
     if arg == '-nameslist':
         nextArgIsNamesList = True
         continue
+    if arg == '-spacefactor':
+        nextArgIsSpaceFactor = True
+        continue
+    if arg == '-verbose':
+        verbose = True
+        continue
+    if arg == '-name':
+        nextArgIsName = True
+        continue
 
+baseFont = None
 for arg in sys.argv:
     if len(arg) > 4:
         if arg[-4:] == '.ttf' or arg[-4:] == '.TTF' or arg[-4:] == '.otf' or arg[-4:] == '.OTF' or arg[-4:] == '.otf' or arg[-4:] == '.SFD' or arg[-4:] == '.sfd':
-            fontList.append(arg)
+            font = fontforge.open(arg)
+            if baseFont == None:
+                baseFont = font
+            else:
+                fontList.append(font)
         if arg[-5:] == '.glif' or arg[-5:] == '.GLIF':
             glifs.add(arg)
     index = index + 1
-mergedFont = fontforge.open(fontList[0])
+
+mergedFont = baseFont 
 supplement = " Mono"
 fontName = mergedFont.fontname + supplement
+if len(name) > 0:
+    fontName = name 
 
 ## use the following ASCII chars as baseWidthChars
 ## the baseWidth will determine the max width
 baseWidthChars = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'x', 'y', 'z']
 
 ## scale all capital letters by at least the same factor as the following letters
-capitalWidthChars = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'X', 'Y', 'Z']
+capitalWidthChars = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'K', 'L', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'X', 'Y', 'Z']
 
 unicodeNamesList = open(namesList)
 lines = unicodeNamesList.readlines()
@@ -84,18 +113,14 @@ for line in lines:
     except:
         continue
 
+nameUnicodes = dict()
+for name in unicodeNames.keys():
+    nameUnicodes[unicodeNames[name]] = name
+
 ## preserve aspect correction for some chars
 preserveAspectChars = set() 
-
 for name in unicodeNames.keys():
-    if name.find("CIRCLED") > 0:
-        preserveAspectChars.add(unicodeNames[name])
-
-    if name == "REGISTERED SIGN":
-        preserveAspectChars.add(unicodeNames[name])
-
-    if name == "COPYRIGHT SIGN":
-        print name
+    for name in ["REGISTERED SIGN", "COPYRIGHT SIGN", "COMMERCIAL AT"]:
         preserveAspectChars.add(unicodeNames[name])
 
 #############################################################
@@ -107,14 +132,54 @@ for char in baseWidthChars :
     maxWidth = max(maxWidth, bounds[2] - bounds[0])
     avgSpacing = avgSpacing + bounds[0] + mergedFont[char].width - bounds[2]
 
-avgSpacing = avgSpacing / len(baseWidthChars) / 2
-
-capitalLetterWidth = -1
-capitalLetterScale = 1.0
-for char in capitalWidthChars:
+avgSpacing = spaceFactor * avgSpacing / len(baseWidthChars) / 2
+if verbose :
+    print sys.argv[0]+": avgSpacing " + str(avgSpacing)
+capitalLetterWidths = 0 
+for char in capitalWidthChars :
     bounds = mergedFont[char].boundingBox()
-    capitalLetterScale = min(capitalLetterScale, (maxWidth - avgSpacing*2)/(bounds[2]-bounds[0]))
-    capitalLetterWidth = max(capitalLetterWidth, bounds[2]-bounds[0])
+    unicodePoint = mergedFont[char].unicode
+    capitalLetterWidths = capitalLetterWidths + bounds[2]-bounds[0]
+
+avgCapitalLetterWidth = capitalLetterWidths / len(capitalWidthChars)
+
+if verbose :
+    print sys.argv[0]+": avgCapitalLetterWidth: " + str(avgCapitalLetterWidth)
+
+mergedFontUnicodePoints = set()
+for glyphName in mergedFont:
+    unicodePoint = mergedFont[glyphName].unicode
+    if unicodePoint > 0:
+        mergedFontUnicodePoints.add(unicodePoint)
+
+for complementFont in fontList :
+    complementFontGlyphs = set()
+
+    for glyphName in complementFont:
+        unicodePoint = complementFont[glyphName].unicode
+        if unicodePoint > 0:
+            complementFontGlyphs.add(unicodePoint)
+
+    successfulMergeUnicodePoints = set()
+
+    for unicodePoint in complementFontGlyphs - mergedFontUnicodePoints :
+        try:
+            complementFont.selection.none()
+            complementFont.selection.select(("unicode",),unicodePoint)
+            complementFont.copy()
+            try:
+                mergedFont.selection.none()
+                mergedFont.selection.select(("unicode",),unicodePoint)
+                mergedFont.paste()
+                successfulMergeUnicodePoints.add(unicodePoint)
+                if verbose :
+                    print sys.argv[0] + ": imported " + nameUnicodes[unicodePoint] + " from " + complementFont.fullname
+            except:
+                pass
+        except:
+            pass
+
+    mergedFontUnicode =  successfulMergeUnicodePoints | mergedFontUnicodePoints
 
 capitalLetters = set()
 for name in unicodeNames:
@@ -131,18 +196,6 @@ for name in unicodeNames:
     if name.find(findName) == 0:
         capitalLetters.add(unicodeNames[name])
 
-mergedFontUnicodePoints = set()
-for glyphName in mergedFont:
-    unicodePoint = mergedFont[glyphName].unicode
-    if unicodePoint > 0:
-        mergedFontUnicodePoints.add(unicodePoint)
-
-for anchorClass in ["mark", "base", "ligature", "basemark", "entry", "exit"]:
-    try:
-        mergedFont.removeAnchorClass(anchorClass)
-    except:
-        pass
-
 ## something's fishy in Fontforge's width properties
 widthDict = dict()
 for glyphName in mergedFont:
@@ -152,60 +205,89 @@ for glyphName in mergedFont:
 
     bounds = mergedFont[glyphName].boundingBox()
     origWidth = bounds[2] - bounds[0]
-    glyphWidth = bounds[2] - bounds[0]
+    glyphWidth = origWidth
+    newMaxWidth = maxWidth
+    unicodePoint = mergedFont[glyphName].unicode
+    newBounds = mergedFont[glyphName].boundingBox()
 
-    if mergedFont[glyphName].unicode in capitalLetters :
-        if glyphWidth < capitalLetterWidth:
-            glyphWidth = capitalLetterWidth 
+    if unicodePoint in capitalLetters :
+        if glyphWidth < avgCapitalLetterWidth :
+            glyphWidth = avgCapitalLetterWidth
 
-    if glyphWidth > maxWidth:
+    #if unicodePoint >= 0x2E9D and unicodePoint <= 0x4DB5 :
+    if unicodePoint >= 0x2E9D:
+        if verbose:
+            print sys.argv[0] + ": doubleWidth: " + unicodePoint
+        mergedFont[glyphName].width = 2*(newMaxWidth + avgSpacing*2)
+    elif glyphWidth > maxWidth:
         try:
-            mergedFont[glyphName].transform(psMat.scale((maxWidth - avgSpacing*2)/(glyphWidth),1))
-            mergedFont[glyphName].transform(psMat.translate(avgSpacing+(glyphWidth-origWidth)/2.0,0.0))
+            heightScale = 1.0
+            widthScale = (maxWidth)/(glyphWidth)
+            if unicodePoint in preserveAspectChars :
+                heightScale = widthScale
+
+            mergedFont[glyphName].transform(psMat.scale(widthScale,heightScale))
+            horiz = avgSpacing-newBounds[0]+(glyphWidth-origWidth)/2.0
+            vert = 0.0
+            mergedFont[glyphName].transform(psMat.translate(horiz,vert))
+            if verbose :
+                print sys.argv[0] + ": " + nameUnicodes[unicodePoint] + " scale width=" + str(widthScale) + ", height=" + str(heightScale)
+                print sys.argv[0] + ": " + str(nameUnicodes[unicodePoint]) + " translate horiz=" + str(widthScale) + ", vert=" + str(heightScale)
         except:
             pass
+        mergedFont[glyphName].width = newMaxWidth + avgSpacing*2
     else:
-        moveDistance = (maxWidth + avgSpacing*2 - widthDict[glyphName])/2.0
-        mergedFont[glyphName].transform(psMat.translate(moveDistance,0.0))
+        horiz = (maxWidth + avgSpacing*2 - widthDict[glyphName])/2.0
+        vert = 0.0
+        mergedFont[glyphName].transform(psMat.translate(horiz,vert))
+        name = ""
+        if unicodePoint in nameUnicodes :
+            name = nameUnicodes[unicodePoint]
+        if verbose :
+            print sys.argv[0] + ": " + name + " translate horiz=" + str(widthScale) + ", vert=" + str(heightScale)
+        mergedFont[glyphName].width = newMaxWidth + avgSpacing*2
 
-    mergedFont[glyphName].width = maxWidth + avgSpacing*2
-    bearing = (mergedFont[glyphName].left_side_bearing + mergedFont[glyphName].right_side_bearing)/2.0
+    if verbose :
+        name = ""
+        if unicodePoint in nameUnicodes.keys():
+            name = nameUnicodes[unicodePoint]
+        else:
+            name = str(unicodePoint)
+
+
+        print sys.argv[0] + ": " + name + " width="+str(mergedFont[glyphName].width)
+       
 
 ## override some broken glyphs
 for glif in glifs :
     pos = os.path.basename(glif).find('_')
     if pos > 0:
-        mergedFont[os.path.basename(glif)[0:pos]].clear()
-        mergedFont[os.path.basename(glif)[0:pos]].importOutlines(glif)
-
-#mergedFont['i'].clear()
-#mergedFont['i'].importOutlines("orig/i_TeXLove.glif")
-#mergedFont['i'].width = maxWidth + avgSpacing*2
-#mergedFont['j'].clear()
-#mergedFont['j'].importOutlines("orig/j_TeXLove.glif")
-#mergedFont['j'].width = maxWidth + avgSpacing*2
+        glyphIndex = os.path.basename(glif)[0:pos]
+        mergedFont[glyphIndex].clear()
+        mergedFont[glyphIndex].importOutlines(glif)
+        mergedFont[glyphIndex].width = maxWidth + avgSpacing*2
 
 ## remove some ligatures, since these may show up in Microsoft's ttf renderer (eg. VS2012)
 ## this is problematic in a monospace font since it combines two or three chars into one,
 ## making the width harder to guess
 try:
-    mergedFont[0xfb00].clear() # ff
+    mergedFont[unicodeNames["LATIN SMALL LIGATURE FF"]].clear()
 except:
     pass
 try:
-    mergedFont[0xfb01].clear() # fi
+    mergedFont[unicodeNames["LATIN SMALL LIGATURE FI"]].clear()
 except:
     pass
 try:
-    mergedFont[0xfb02].clear() # fl
+    mergedFont[unicodeNames["LATIN SMALL LIGATURE FL"]].clear()
 except:
     pass
 try:
-    mergedFont[0xfb03].clear() # ffi
+    mergedFont[unicodeNames["LATIN SMALL LIGATURE FFI"]].clear()
 except:
     pass
 try:
-    mergedFont[0xfb04].clear() # ffl
+    mergedFont[unicodeNames["LATIN SMALL LIGATURE FFL"]].clear()
 except:
     pass
 
