@@ -41,11 +41,19 @@ index = 0
 spaceFactor = 1.0
 nextArgIsNamesList = False
 nextArgIsSpaceFactor = False
-nextArgIsName = False
-name = ""
+nextArgIsPSName = False
+nextArgIsFullName = False
+nextArgIsCopyright = False
+copyright = ""
+psName = ""
+fullName = ""
 verbose = False
 for arg in sys.argv:
     index = index + 1
+    if nextArgIsCopyright :
+        nextArgIsCopyright = False
+        copyright = arg
+        continue
     if nextArgIsNamesList :
         namesList = arg
         nextArgIsNamesList = False
@@ -54,10 +62,15 @@ for arg in sys.argv:
         nextArgIsSpaceFactor = False
         spaceFactor = float(arg)
         continue
-    if nextArgIsName :
-        nextArgIsName = False
-        name = arg
+    if nextArgIsPSName :
+        nextArgIsPSName = False
+        psName = arg
         continue
+    if nextArgIsFullName :
+        nextArgIsFullName = False
+        fullName = arg
+        continue
+
     if arg == '-nameslist':
         nextArgIsNamesList = True
         continue
@@ -67,8 +80,14 @@ for arg in sys.argv:
     if arg == '-verbose':
         verbose = True
         continue
-    if arg == '-name':
-        nextArgIsName = True
+    if arg == '-psname':
+        nextArgIsPSName = True
+        continue
+    if arg == '-fullname':
+        nextArgIsFullName = True
+        continue
+    if arg == '-copyright':
+        nextArgIsCopyright = True
         continue
 
 baseFont = None
@@ -85,10 +104,28 @@ for arg in sys.argv:
     index = index + 1
 
 mergedFont = baseFont 
+#mergedFont = fontforge.font()
+#mergedFont.encoding = 'UnicodeBmp'
 supplement = " Mono"
 fontName = mergedFont.fontname + supplement
-if len(name) > 0:
-    fontName = name 
+if len(psName) > 0:
+    fontName = psName 
+
+## set name and values
+mergedFont.fontname = fontName
+#mergedFont.fontname = fontName.replace(" ","")
+if len(fullName) > 0:
+    mergedFont.fullname = fullName
+else:
+    mergedFont.fullname = fontName.replace(" ","_")
+mergedFont.familyname = fontName
+
+if mergedFont.fontlog == None:
+   mergedFont.fontlog = ""
+mergedFont.fontlog = mergedFont.fontlog + "Modified into monospace by monospaci.py (https://github.com/arnognulf/monospaci.py)\n"
+mergedFont.os2_panose = (2, 9, 5, 9, 0, 0, 0, 0, 0, 0) 
+mergedFont.os2_fstype = 8
+mergedFont.copyright = copyright
 
 ## use the following ASCII chars as baseWidthChars
 ## the baseWidth will determine the max width
@@ -125,27 +162,6 @@ for name in unicodeNames.keys():
 
 #############################################################
 
-maxWidth = -1.0
-avgSpacing = 0.0
-for char in baseWidthChars :
-    bounds = mergedFont[char].boundingBox()
-    maxWidth = max(maxWidth, bounds[2] - bounds[0])
-    avgSpacing = avgSpacing + bounds[0] + mergedFont[char].width - bounds[2]
-
-avgSpacing = spaceFactor * avgSpacing / len(baseWidthChars) / 2
-if verbose :
-    print sys.argv[0]+": avgSpacing " + str(avgSpacing)
-capitalLetterWidths = 0 
-for char in capitalWidthChars :
-    bounds = mergedFont[char].boundingBox()
-    unicodePoint = mergedFont[char].unicode
-    capitalLetterWidths = capitalLetterWidths + bounds[2]-bounds[0]
-
-avgCapitalLetterWidth = capitalLetterWidths / len(capitalWidthChars)
-
-if verbose :
-    print sys.argv[0]+": avgCapitalLetterWidth: " + str(avgCapitalLetterWidth)
-
 mergedFontUnicodePoints = set()
 for glyphName in mergedFont:
     unicodePoint = mergedFont[glyphName].unicode
@@ -179,7 +195,33 @@ for complementFont in fontList :
         except:
             pass
 
+    newUnicodeRanges = ( mergedFont.os2_unicoderanges[0] | complementFont.os2_unicoderanges[0], mergedFont.os2_unicoderanges[1] | complementFont.os2_unicoderanges[1], mergedFont.os2_unicoderanges[2] | complementFont.os2_unicoderanges[2], mergedFont.os2_unicoderanges[3] | complementFont.os2_unicoderanges[3] )
+    mergedFont.os2_unicoderanges = newUnicodeRanges
+    newCodepages = ( mergedFont.os2_codepages[0] | complementFont.os2_codepages[0], mergedFont.os2_codepages[1] | complementFont.os2_codepages[1])
+    mergedFont.os2_codepages = newCodepages
     mergedFontUnicode =  successfulMergeUnicodePoints | mergedFontUnicodePoints
+
+
+maxWidth = -1.0
+avgSpacing = 0.0
+for char in baseWidthChars :
+    bounds = mergedFont[char].boundingBox()
+    maxWidth = max(maxWidth, bounds[2] - bounds[0])
+    avgSpacing = avgSpacing + bounds[0] + mergedFont[char].width - bounds[2]
+
+avgSpacing = spaceFactor * avgSpacing / len(baseWidthChars) / 2
+if verbose :
+    print sys.argv[0]+": avgSpacing " + str(avgSpacing)
+capitalLetterWidths = 0 
+for char in capitalWidthChars :
+    bounds = mergedFont[char].boundingBox()
+    unicodePoint = mergedFont[char].unicode
+    capitalLetterWidths = capitalLetterWidths + bounds[2]-bounds[0]
+
+avgCapitalLetterWidth = capitalLetterWidths / len(capitalWidthChars)
+
+if verbose :
+    print sys.argv[0]+": avgCapitalLetterWidth: " + str(avgCapitalLetterWidth)
 
 capitalLetters = set()
 for name in unicodeNames:
@@ -201,8 +243,11 @@ widthDict = dict()
 for glyphName in mergedFont:
     widthDict[glyphName] = mergedFont[glyphName].width
 
+## remove all references to other glyphs, since these may distort some glyphs when scaling
 for glyphName in mergedFont:
+    mergedFont[glyphName].unlinkRef()
 
+for glyphName in mergedFont:
     bounds = mergedFont[glyphName].boundingBox()
     origWidth = bounds[2] - bounds[0]
     glyphWidth = origWidth
@@ -218,7 +263,8 @@ for glyphName in mergedFont:
     if unicodePoint >= 0x2E9D:
         if verbose:
             print sys.argv[0] + ": doubleWidth: " + unicodePoint
-        mergedFont[glyphName].width = 2*(newMaxWidth + avgSpacing*2)
+        mergedFont[glyphName].width = newMaxWidth + avgSpacing*2
+        #mergedFont[glyphName].width = 2*(newMaxWidth + avgSpacing*2)
     elif glyphWidth > maxWidth:
         try:
             heightScale = 1.0
@@ -291,17 +337,6 @@ try:
 except:
     pass
 
-## set name and values
-mergedFont.fontname = fontName.replace(" ","")
-mergedFont.fullname = fontName.replace(" ","")
-mergedFont.familyname = fontName.replace(" ","")
-
-if mergedFont.fontlog == None:
-   mergedFont.fontlog = ""
-mergedFont.fontlog = mergedFont.fontlog + "Modified into monospace by monospaci.py (https://github.com/arnognulf/monospaci.py)\n"
-mergedFont.os2_panose = (2, 9, 5, 9, 0, 0, 0, 0, 0, 0) 
-mergedFont.os2_fstype = 8
-
 fontForgeOutput = fontName + "-Output.ttf"
 ttfAutoHintOutput = "TTFAutoHint-Output.ttf"
 finalOutput = fontName.replace(" ","-")+ "-Regular.ttf"
@@ -309,11 +344,11 @@ finalOutput = fontName.replace(" ","-")+ "-Regular.ttf"
 mergedFont.generate(fontForgeOutput, flags=('PfEd-comments',))
 
 ## ttfautohint mangles our OS/2 table, containing vital Monospace bits, stash away...
-subprocess.call(["ttftable", "-export", "OS/2=os2.fontforge", fontForgeOutput])
+#subprocess.call(["ttftable", "-export", "OS/2=os2.fontforge", fontForgeOutput])
 ## ttfautohint outputs GDI ClearType hinting
-subprocess.call(["ttfautohint", "-w", "G", fontForgeOutput, ttfAutoHintOutput])
+subprocess.call(["ttfautohint", "-w", "G", fontForgeOutput, finalOutput])
 ## restore our saved OS/2 table
-subprocess.call(["ttftable", "-import", "OS/2=os2.fontforge", ttfAutoHintOutput, finalOutput])
+#subprocess.call(["ttftable", "-import", "OS/2=os2.fontforge", ttfAutoHintOutput, finalOutput])
 len(mergedFont)
 exit(0)
 
