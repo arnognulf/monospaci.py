@@ -125,7 +125,9 @@ mergedFont = baseFont
 #mergedFont = fontforge.font()
 #mergedFont.encoding = 'UnicodeBmp'
 supplement = " Mono"
-fontName = mergedFont.fontname + supplement
+oldname = mergedFont.fontname
+mergedFont.sfnt_names = ()
+fontName = oldname + supplement
 if len(psName) > 0:
     fontName = psName 
 
