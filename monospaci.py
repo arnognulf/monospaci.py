@@ -45,11 +45,13 @@ nextArgIsPSName = False
 nextArgIsFullName = False
 nextArgIsCopyright = False
 nextArgIsXAdjust = False
+nextArgIsLeadingScale = False
 copyright = ""
 psName = ""
 fullName = ""
 verbose = False
 xadjust = 0
+leadingScale = 0.0
 for arg in sys.argv:
     index = index + 1
     if nextArgIsXAdjust :
@@ -76,6 +78,10 @@ for arg in sys.argv:
         nextArgIsFullName = False
         fullName = arg
         continue
+    if nextArgIsLeadingScale:
+        nextArgIsLeadingScale = False
+        leadingScale = float(arg)
+        continue
 
     if arg == '-nameslist':
         nextArgIsNamesList = True
@@ -97,6 +103,9 @@ for arg in sys.argv:
         continue
     if arg == '-xadjust':
         nextArgIsXAdjust = True
+        continue
+    if arg == '-leadingscale':
+        nextArgIsLeadingScale = True
         continue
 
 baseFont = None
@@ -360,18 +369,34 @@ try:
 except:
     pass
 
-fontForgeOutput = fontName + "-Output.ttf"
-ttfAutoHintOutput = "TTFAutoHint-Output.ttf"
-finalOutput = fontName.replace(" ","-")+ "-Regular.ttf"
+## trial-and-error estimation of linespacing in css
+if leadingScale != 0.0:
+    capHeight = mergedFont.capHeight
+    mergedFont.hhea_ascent_add = 0
+    mergedFont.hhea_descent_add = 0
+    mergedFont.hhea_linegap = 0
+    mergedFont.os2_winascent_add = 1
+    mergedFont.os2_windescent_add = 1
+    mergedFont.os2_typoascent_add = 1
+    mergedFont.os2_typodescent_add = 1
+    mergedFont.os2_typoascent = 0 
+    mergedFont.os2_typodescent = 0
+    mergedFont.hhea_linegap = 0
 
-mergedFont.generate(fontForgeOutput, flags=('PfEd-comments',))
+    leadPadding = (float(capHeight) * leadingScale - (capHeight)) / 2.0
+    mergedFont.hhea_ascent = capHeight + capHeight*0.10 + leadPadding
+    mergedFont.hhea_descent = -1 * leadPadding - capHeight*0.40
 
-## ttfautohint mangles our OS/2 table, containing vital Monospace bits, stash away...
-#subprocess.call(["ttftable", "-export", "OS/2=os2.fontforge", fontForgeOutput])
+    ## doesn't make a difference in linux, untested in windows
+    mergedFont.os2_winascent = mergedFont.hhea_ascent
+    mergedFont.os2_windescent = mergedFont.hhea_descent
+
+ttfAutoHintInput = "TTFAutoHint-Input.ttf"
+finalOutput = fontName.replace(" ","-")+ ".ttf"
+
+mergedFont.generate(ttfAutoHintInput, flags=('PfEd-comments',))
+
 ## ttfautohint outputs GDI ClearType hinting
-subprocess.call(["ttfautohint", "-w", "G", fontForgeOutput, finalOutput])
-## restore our saved OS/2 table
-#subprocess.call(["ttftable", "-import", "OS/2=os2.fontforge", ttfAutoHintOutput, finalOutput])
-len(mergedFont)
+subprocess.call(["ttfautohint", "-w", "G", ttfAutoHintInput, finalOutput])
 exit(0)
 
