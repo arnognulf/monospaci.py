@@ -46,12 +46,18 @@ nextArgIsFullName = False
 nextArgIsCopyright = False
 nextArgIsXAdjust = False
 nextArgIsLeadingScale = False
+nextArgIsFamilyName = False
+nextArgIsNoScaleChar = False
+
 copyright = ""
 psName = ""
 fullName = ""
 verbose = False
 xadjust = 0
 leadingScale = 0.0
+familyName = ""
+index = 0
+noScaleChars = list()
 for arg in sys.argv:
     index = index + 1
     if nextArgIsXAdjust :
@@ -74,6 +80,10 @@ for arg in sys.argv:
         nextArgIsPSName = False
         psName = arg
         continue
+    if nextArgIsFamilyName :
+        nextArgIsFamilyName = False
+        familyName = arg
+        continue
     if nextArgIsFullName :
         nextArgIsFullName = False
         fullName = arg
@@ -82,7 +92,10 @@ for arg in sys.argv:
         nextArgIsLeadingScale = False
         leadingScale = float(arg)
         continue
-
+    if nextArgIsNoScaleChar:
+        nextArgIsNoScaleChar = False
+        noScaleChars.append(arg)
+        continue
     if arg == '-nameslist':
         nextArgIsNamesList = True
         continue
@@ -107,11 +120,19 @@ for arg in sys.argv:
     if arg == '-leadingscale':
         nextArgIsLeadingScale = True
         continue
+    if arg == '-familyname':
+        nextArgIsFamilyName = True
+        continue
+    if arg == '-noscalechar':
+        nextArgIsNoScaleChar = True
+        continue
+
 
 baseFont = None
+index = 0
 for arg in sys.argv:
-    if len(arg) > 4:
-        if arg[-4:] == '.ttf' or arg[-4:] == '.TTF' or arg[-4:] == '.otf' or arg[-4:] == '.OTF' or arg[-4:] == '.otf' or arg[-4:] == '.SFD' or arg[-4:] == '.sfd':
+    if len(arg) > 6:
+        if arg[-4:] == '.ttf' or arg[-4:] == '.TTF' or arg[-4:] == '.otf' or arg[-6:] == '.sfdir':
             font = fontforge.open(arg)
             if baseFont == None:
                 baseFont = font
@@ -119,13 +140,18 @@ for arg in sys.argv:
                 fontList.append(font)
         if arg[-5:] == '.glif' or arg[-5:] == '.GLIF':
             glifs.add(arg)
-    index = index + 1
+
+if baseFont == None:
+    print "could not open font"
+    exit(42)
 
 mergedFont = baseFont 
-#mergedFont = fontforge.font()
 #mergedFont.encoding = 'UnicodeBmp'
 supplement = " Mono"
-oldname = mergedFont.fontname
+oldname = "UnnamedFont"
+if mergedFont.fontname != None:
+    oldname = mergedFont.fontname
+
 mergedFont.sfnt_names = ()
 fontName = oldname + supplement
 if len(psName) > 0:
@@ -138,7 +164,10 @@ if len(fullName) > 0:
     mergedFont.fullname = fullName
 else:
     mergedFont.fullname = fontName.replace(" ","_")
-mergedFont.familyname = fontName
+if len(familyName) > 0:
+    mergedFont.familyname = familyName
+else:
+    mergedFont.fullname = fontName
 
 if mergedFont.fontlog == None:
    mergedFont.fontlog = ""
@@ -297,7 +326,11 @@ for glyphName in mergedFont:
     elif glyphWidth > maxWidth :
         try:
             heightScale = 1.0
-            widthScale = (maxWidth)/(glyphWidth)
+            if glyphName in noScaleChars :
+                widthScale = 1.0
+            else:
+                widthScale = (maxWidth)/(glyphWidth)
+
             #widthScale = (glyphWidth)/(maxWidth)
             if unicodePoint in preserveAspectChars :
                 heightScale = widthScale
