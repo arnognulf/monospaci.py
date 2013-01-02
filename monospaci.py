@@ -57,9 +57,14 @@ xadjust = 0
 leadingScale = 0.0
 familyName = ""
 index = 0
+firstArg = True
 noScaleChars = list()
+baseFont = None
 for arg in sys.argv:
     index = index + 1
+    if firstArg:
+        firstArg = False
+        continue
     if nextArgIsXAdjust :
         xadjust = arg
         nextArgIsXAdjust = False
@@ -126,20 +131,15 @@ for arg in sys.argv:
     if arg == '-noscalechar':
         nextArgIsNoScaleChar = True
         continue
+    print 'opening ' + arg
+    font = fontforge.open(arg)
 
-
-baseFont = None
-index = 0
-for arg in sys.argv:
-    if len(arg) > 6:
-        if arg[-4:] == '.ttf' or arg[-4:] == '.TTF' or arg[-4:] == '.otf' or arg[-6:] == '.sfdir':
-            font = fontforge.open(arg)
-            if baseFont == None:
-                baseFont = font
-            else:
-                fontList.append(font)
-        if arg[-5:] == '.glif' or arg[-5:] == '.GLIF':
-            glifs.add(arg)
+    if baseFont == None:
+        baseFont = font
+    else:
+        fontList.append(font)
+    if arg[-5:] == '.glif' or arg[-5:] == '.GLIF':
+        glifs.add(arg)
 
 if baseFont == None:
     print "could not open font"
