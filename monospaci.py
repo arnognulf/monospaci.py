@@ -365,7 +365,10 @@ for glyphName in mergedFont:
 
 
         print sys.argv[0] + ": " + name + " width="+str(mergedFont[glyphName].width)
-       
+
+# the names do not always hit all altuni names, force these to monospace too
+for glyph in mergedFont.glyphs():
+    glyph.width = finalWidthScale * (maxWidth + avgSpacing*2)
 
 ## override some broken glyphs
 if len(glifs) > 0:
